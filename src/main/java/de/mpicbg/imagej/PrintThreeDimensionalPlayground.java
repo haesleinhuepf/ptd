@@ -9,6 +9,7 @@
 package de.mpicbg.imagej;
 
 import fiji.util.gui.GenericDialogPlus;
+import ij.IJ;
 import net.imagej.Dataset;
 import net.imagej.ImageJ;
 import net.imagej.mesh.Mesh;
@@ -42,7 +43,7 @@ import java.util.Random;
 /**
  *
  */
-@Plugin(type = Command.class, menuPath = "Plugins>PTD")
+@Plugin(type = Command.class, menuPath = "SpimCat>Presentation>Export STL")
 public class PrintThreeDimensionalPlayground<T extends RealType<T>> implements Command {
 
     @Parameter
@@ -55,41 +56,60 @@ public class PrintThreeDimensionalPlayground<T extends RealType<T>> implements C
     public void run() {
         final Img<T> image = (Img<T>)currentData.getImgPlus();
 
-        /*
-        GenericDialogPlus dialog = new GenericDialogPlus("Select file");
-        dialog.addFileField("File", "");
+        GenericDialogPlus dialog = new GenericDialogPlus("Export STL");
+        dialog.addNumericField("Gaussian blur sigma", 2.0, 1);
+        dialog.addChoice("Threshold algorithm", ApplyThreshold.getAvailableThresholdAlgorithms(), "ij1");
+
+        dialog.addFileField("Save to: ", "output.stl");
         dialog.showDialog();
         if (dialog.wasCanceled()) {
             return;
         }
+        double sigma = dialog.getNextNumber();
+        String thresholdAlgorithm = dialog.getNextChoice();
         String filename = dialog.getNextString();
-        */
-        String filename = "src/main/resources/hello.stl";
 
-        System.out.println("Hello world.");
+        //String filename = "src/main/resources/hello.stl";
+
+        IJ.showStatus("Blurring");
+        IJ.showProgress(0.1);
 
         // apply a gaussian blur
-        RandomAccessibleInterval gaussFiltered = ij.op().filter().gauss(image, 2.0, 2.0, 2.0);
+        RandomAccessibleInterval gaussFiltered = ij.op().filter().gauss(image, sigma, sigma, sigma);
 
         // show the blurred image
         ij.ui().show(gaussFiltered);
 
-        // apply a threshold using Otsu's method
-        IterableInterval otsuThresholded = ij.op().threshold().otsu(Views.iterable(gaussFiltered));
+        IJ.showStatus("Thresholding");
+        IJ.showProgress(0.2);
 
-        ij.ui().show(otsuThresholded);
+        // apply a threshold using selected method
+        IterableInterval thresholded = new ApplyThreshold(thresholdAlgorithm, Views.iterable(gaussFiltered), ij.op()).getOutput();
+                //ij.op().threshold().otsu(Views.iterable(gaussFiltered));
 
-        Mesh mesh2 = ij.op().geom().marchingCubes((Img)otsuThresholded);
+        ij.ui().show(thresholded);
+
+        IJ.showStatus("Derive mesh");
+        IJ.showProgress(0.3);
+
+        Mesh mesh2 = ij.op().geom().marchingCubes((Img)thresholded);
+
+        IJ.showStatus("Saving");
+        IJ.showProgress(0.9);
 
         try {
             ij.io().save(mesh2, filename);
         } catch (IOException e) {
             e.printStackTrace();
         }
+        System.out.println("Bye!");
+        IJ.showStatus("Export STL done");
+        IJ.showProgress(1.0);
+
 
         if (true) return;
 
-        ImgLabeling cca = ij.op().labeling().cca((Img) otsuThresholded, ConnectedComponents.StructuringElement.FOUR_CONNECTED);
+        ImgLabeling cca = ij.op().labeling().cca((Img) thresholded, ConnectedComponents.StructuringElement.FOUR_CONNECTED);
 
         LabelRegions<IntegerType> regions = new LabelRegions(cca);
 
@@ -142,7 +162,8 @@ public class PrintThreeDimensionalPlayground<T extends RealType<T>> implements C
         ij.ui().showUI();
 
         // ask the user for a file to open
-        final File file = new File("src/main/resources/t1-head.tif");
+        final File file = new File("C:/structure/data/organoids_ByungHo/input_crop.tif");
+                //"src/main/resources/t1-head.tif");
 
         if (file != null) {
             // load the dataset
