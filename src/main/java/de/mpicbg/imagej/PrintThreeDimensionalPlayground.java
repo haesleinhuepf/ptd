@@ -79,6 +79,16 @@ public class PrintThreeDimensionalPlayground<T extends RealType<T>> implements C
 
         ij.ui().show(otsuThresholded);
 
+        Mesh mesh2 = ij.op().geom().marchingCubes((Img)otsuThresholded);
+
+        try {
+            ij.io().save(mesh2, filename);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if (true) return;
+
         ImgLabeling cca = ij.op().labeling().cca((Img) otsuThresholded, ConnectedComponents.StructuringElement.FOUR_CONNECTED);
 
         LabelRegions<IntegerType> regions = new LabelRegions(cca);
